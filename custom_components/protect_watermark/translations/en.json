@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Choose a UniFi Protect console",
+        "description": "Pick the UniFi Protect console whose cameras should get watermark entities. This integration uses that console's existing sign-in.",
+        "data": {
+          "protect_entry_id": "UniFi Protect console"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This UniFi Protect console is already set up.",
+      "no_protect": "Set up the UniFi Protect integration first. It must be loaded and signed in with a local username and password, not only an API key."
+    }
+  },
+  "entity": {
+    "text": {
+      "watermark_top_left": { "name": "Watermark top left" },
+      "watermark_top_right": { "name": "Watermark top right" },
+      "watermark_bottom_left": { "name": "Watermark bottom left" },
+      "watermark_bottom_right": { "name": "Watermark bottom right" }
+    }
+  },
+  "issues": {
+    "protect_public_only": {
+      "title": "UniFi Protect has no private API access",
+      "description": "UniFi Protect Watermark sets the watermark through Protect's private API, using the UniFi Protect integration's sign-in. That integration is set up with an API key only, or no longer uses a username and password, so the watermark can't be changed.\n\nReconfigure the UniFi Protect integration with a local username and password, then reload UniFi Protect Watermark."
+    }
+  }
+}

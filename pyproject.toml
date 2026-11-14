@@ -1,0 +1,78 @@
+[project]
+name = "ha-protect-watermark"
+version = "0.1.0"
+description = "Home Assistant custom integration that sets the text of UniFi Protect's camera watermark."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "--cov=custom_components.protect_watermark --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+branch = true
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ARG001",  # Home Assistant fixes platform function signatures
+    "CPY001",  # the licence is in LICENSE
+    "D107",    # __init__ is documented on the class
+    "E501",    # the formatter handles line length
+    "TC001",   # Home Assistant imports at runtime
+    "TC002",
+    "TC003",
+    "COM812",  # conflicts with the formatter
+    "D203",    # conflicts with D211
+    "D213",    # conflicts with D212
+    "ISC001",  # conflicts with the formatter
+    "TRY003",  # messages are passed to Home Assistant's exceptions on purpose
+    "EM101",
+    "EM102",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",     # pytest asserts
+    "PLR2004",  # literal values in asserts
+    "SLF001",
+    "D",
+    "ANN401",
+    "PLR0913",  # pytest fixtures are arguments
+    "PLR0917",
+    "FBT001",   # parametrized flags
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["homeassistant"]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.pyright]
+include = ["custom_components", "tests"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportPrivateUsage = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportImplicitOverride = "error"
+reportUninitializedInstanceVariable = "error"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportPrivateUsage = "none"
+# ConfigFlowResult keys depend on the result type, which the tests assert first.
+reportTypedDictNotRequiredAccess = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "custom_components"

@@ -1,0 +1,10 @@
+{
+  "entity": {
+    "text": {
+      "watermark_top_left": { "default": "mdi:watermark" },
+      "watermark_top_right": { "default": "mdi:watermark" },
+      "watermark_bottom_left": { "default": "mdi:watermark" },
+      "watermark_bottom_right": { "default": "mdi:watermark" }
+    }
+  }
+}
