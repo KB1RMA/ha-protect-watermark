@@ -92,13 +92,17 @@ Check how your cameras render special characters, such as `°`, before relying o
 
 ## Development
 
+Development uses [uv](https://docs.astral.sh/uv/). `uv sync` creates `.venv` from `uv.lock`, including a
+Python that matches Home Assistant's minimum if you don't have one.
+
 ```bash
-python3.14 -m venv .venv
-.venv/bin/pip install -r requirements_test.txt
-.venv/bin/ruff check . && .venv/bin/ruff format --check .
-.venv/bin/pyright
-.venv/bin/pytest
+uv sync
+uv run ruff check . && uv run ruff format --check .
+uv run pyright
+uv run pytest
 ```
+
+The `uiprotect` pin in `pyproject.toml` must match the version Home Assistant's UniFi Protect integration pins.
 
 CI runs Ruff, Pyright in strict mode, the tests (100% coverage required), hassfest and HACS validation.
 
