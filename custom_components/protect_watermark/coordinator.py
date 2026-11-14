@@ -24,6 +24,7 @@ from .api import (
     patch_overlay,
 )
 from .const import CONF_PROTECT_ENTRY_ID, DOMAIN, SCAN_INTERVAL
+from .support import async_update_support_issue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
 
     async def _async_discover(self, api: ProtectApiClient) -> OverlayData:
         data: OverlayData = {}
+        unsupported: list[OverlayCamera] = []
         for camera in adopted_cameras(api):
             try:
                 settings = await get_overlay(api, camera.id)
@@ -99,6 +101,7 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
             except BadRequest:
                 # Older cameras only have the legacy OSD (name, date, logo).
                 _LOGGER.debug("%s doesn't support the overlay API", camera.name)
+                unsupported.append(camera)
                 continue
             except (ClientError, TypeError) as err:
                 raise UpdateFailed(
@@ -107,6 +110,13 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
             self.cameras[camera.id] = camera
             data[camera.id] = settings
         self._discovered = True
+        async_update_support_issue(
+            self.hass,
+            self.config_entry,
+            api,
+            any_supported=bool(self.cameras),
+            unsupported=unsupported,
+        )
         return data
 
     async def async_set_corner(

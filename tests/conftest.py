@@ -109,12 +109,22 @@ class FakeProtect:
         }
 
 
-def _camera(camera_id: str, mac: str, name: str, *, ours: bool = True) -> MagicMock:
+def _camera(
+    camera_id: str,
+    mac: str,
+    name: str,
+    *,
+    ours: bool = True,
+    model: str = "G6 Bullet",
+    firmware: str = "5.4.23",
+) -> MagicMock:
     camera = MagicMock()
     camera.id = camera_id
     camera.mac = mac
     camera.name = name
     camera.is_adopted_by_us = ours
+    camera.market_name = model
+    camera.firmware_version = firmware
     return camera
 
 
@@ -137,9 +147,16 @@ def protect_api(fake_protect: FakeProtect) -> MagicMock:
     api = MagicMock(spec=ProtectApiClient)
     api.is_public_only = False
     api.api_request = AsyncMock(side_effect=fake_protect.api_request)
+    api.bootstrap.nvr.version = "7.2.105"
     api.bootstrap.cameras = {
         OVERLAY_CAMERA_ID: _camera(OVERLAY_CAMERA_ID, OVERLAY_CAMERA_MAC, "Driveway"),
-        LEGACY_CAMERA_ID: _camera(LEGACY_CAMERA_ID, LEGACY_CAMERA_MAC, "Front Door"),
+        LEGACY_CAMERA_ID: _camera(
+            LEGACY_CAMERA_ID,
+            LEGACY_CAMERA_MAC,
+            "Front Door",
+            model="G4 Doorbell",
+            firmware="4.74.106",
+        ),
         OTHER_NVR_CAMERA_ID: _camera(
             OTHER_NVR_CAMERA_ID, "F09FC2000002", "Not ours", ours=False
         ),

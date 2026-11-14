@@ -23,3 +23,10 @@ CORNERS: Final[dict[str, str]] = {
 HA_TEXT_MAX: Final = 255
 
 ISSUE_PUBLIC_ONLY: Final = "protect_public_only"
+ISSUE_NO_SUPPORTED_CAMERAS: Final = "no_supported_cameras"
+
+# The first Protect release with the visible watermark, and the camera firmware
+# its release notes require for it. Only used to word the repair issue: whether a
+# camera gets entities depends on Protect answering its overlay request.
+MIN_PROTECT_VERSION: Final = "7.2.98"
+MIN_CAMERA_FIRMWARE: Final = "5.4"

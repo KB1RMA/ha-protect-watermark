@@ -10,6 +10,7 @@ from homeassistant.helpers import issue_registry as ir
 from .api import ProtectPublicOnlyError, ProtectUnavailableError, get_protect_client
 from .const import CONF_PROTECT_ENTRY_ID, DOMAIN, ISSUE_PUBLIC_ONLY
 from .coordinator import OverlayCoordinator, ProtectWatermarkConfigEntry
+from .support import issue_id
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -60,5 +61,6 @@ async def async_unload_entry(
 async def async_remove_entry(
     hass: HomeAssistant, entry: ProtectWatermarkConfigEntry
 ) -> None:
-    """Remove the repair issue when the entry is deleted."""
+    """Remove the repair issues when the entry is deleted."""
     ir.async_delete_issue(hass, DOMAIN, f"{ISSUE_PUBLIC_ONLY}_{entry.entry_id}")
+    ir.async_delete_issue(hass, DOMAIN, issue_id(entry))

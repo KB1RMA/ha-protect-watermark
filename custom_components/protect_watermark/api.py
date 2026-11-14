@@ -33,11 +33,14 @@ class ProtectPublicOnlyError(Exception):
 
 @dataclass(slots=True, frozen=True)
 class OverlayCamera:
-    """A camera that supports the overlay API."""
+    """An adopted Protect camera."""
 
     id: str
     mac: str
     name: str
+    # Only used to explain why a camera has no watermark entities.
+    model: str | None = None
+    firmware: str | None = None
 
 
 def get_protect_client(hass: HomeAssistant, protect_entry_id: str) -> ProtectApiClient:
@@ -68,10 +71,21 @@ def get_protect_client(hass: HomeAssistant, protect_entry_id: str) -> ProtectApi
 def adopted_cameras(api: ProtectApiClient) -> list[OverlayCamera]:
     """Return the adopted cameras from the Protect integration's bootstrap."""
     return [
-        OverlayCamera(id=camera.id, mac=camera.mac, name=camera.name or camera.mac)
+        OverlayCamera(
+            id=camera.id,
+            mac=camera.mac,
+            name=camera.name or camera.mac,
+            model=camera.market_name,
+            firmware=camera.firmware_version,
+        )
         for camera in api.bootstrap.cameras.values()
         if camera.is_adopted_by_us
     ]
+
+
+def protect_version(api: ProtectApiClient) -> str:
+    """Return the console's UniFi Protect version."""
+    return str(api.bootstrap.nvr.version)
 
 
 async def get_overlay(api: ProtectApiClient, camera_id: str) -> dict[str, Any]:
