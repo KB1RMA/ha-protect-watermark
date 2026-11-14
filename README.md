@@ -4,6 +4,7 @@
 [![Marketplace: custom repository](https://img.shields.io/badge/Marketplace-custom_repository-41BDF5)](#installation)
 [![Home Assistant 2026.10+](https://img.shields.io/badge/Home_Assistant-2026.10%2B-41BDF5?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
 [![CI](https://github.com/KB1RMA/ha-protect-watermark/actions/workflows/ci.yml/badge.svg)](https://github.com/KB1RMA/ha-protect-watermark/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/KB1RMA/ha-protect-watermark/graph/badge.svg)](https://codecov.io/gh/KB1RMA/ha-protect-watermark)
 [![License: MIT](https://img.shields.io/github/license/KB1RMA/ha-protect-watermark)](LICENSE)
 
 [![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=KB1RMA&repository=ha-protect-watermark&category=integration)
