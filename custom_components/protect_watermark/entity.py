@@ -2,33 +2,36 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 import logging
 from typing import Any, cast, override
 
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import OverlayCamera
 from .const import CORNERS
-from .coordinator import OverlayCoordinator
+from .coordinator import OverlayCoordinator, OverlayData, ProtectWatermarkConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def camera_devices(
-    hass: HomeAssistant, coordinator: OverlayCoordinator
+    hass: HomeAssistant, coordinator: OverlayCoordinator, data: OverlayData
 ) -> Iterator[tuple[OverlayCamera, dr.DeviceEntry, dict[str, Any]]]:
-    """Yield each overlay camera with its UniFi Protect device and settings.
+    """Yield each camera in ``data`` with its UniFi Protect device and settings.
 
     Entities join the camera's device, which the UniFi Protect integration
     owns. A device belongs to one config entry, so they link to it with
     ``device_entry`` rather than registering device info.
     """
     device_registry = dr.async_get(hass)
-    for camera in coordinator.cameras.values():
+    for camera_id, settings in data.items():
+        camera = coordinator.cameras[camera_id]
         device = device_registry.async_get_device_by_connection(
             (dr.CONNECTION_NETWORK_MAC, dr.format_mac(camera.mac)),
             coordinator.protect_entry_id,
@@ -39,7 +42,29 @@ def camera_devices(
                 camera.name,
             )
             continue
-        yield camera, device, coordinator.data.get(camera.id) or {}
+        yield camera, device, settings or {}
+
+
+@callback
+def async_add_camera_entities(
+    hass: HomeAssistant,
+    entry: ProtectWatermarkConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+    build: Callable[[OverlayCamera, dr.DeviceEntry, dict[str, Any]], Iterable[Entity]],
+) -> None:
+    """Add each camera's entities now, and those of cameras found later."""
+    coordinator = entry.runtime_data
+
+    @callback
+    def add(data: OverlayData) -> None:
+        async_add_entities(
+            entity
+            for camera, device, settings in camera_devices(hass, coordinator, data)
+            for entity in build(camera, device, settings)
+        )
+
+    add(coordinator.data)
+    entry.async_on_unload(coordinator.async_add_camera_listener(add))
 
 
 def capability[T](settings: dict[str, Any], name: str, default: T) -> T:
@@ -98,6 +123,12 @@ class WatermarkEntity(CoordinatorEntity[OverlayCoordinator]):
     def _update_from_settings(self, settings: dict[str, Any]) -> None:
         """Copy a camera's overlay settings into the entity's attributes."""
         raise NotImplementedError  # pragma: no cover
+
+    @override
+    async def async_added_to_hass(self) -> None:
+        """Catch up with data that arrived after the entity was built."""
+        await super().async_added_to_hass()
+        self._update_from_data()
 
     @callback
     @override

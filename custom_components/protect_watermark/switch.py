@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import OverlayCamera
 from .coordinator import OverlayCoordinator, ProtectWatermarkConfigEntry
-from .entity import WatermarkEntity, camera_devices
+from .entity import WatermarkEntity, async_add_camera_entities
 
 PARALLEL_UPDATES = 1
 
@@ -25,9 +25,11 @@ async def async_setup_entry(
 ) -> None:
     """Add a watermark switch for each overlay camera."""
     coordinator = entry.runtime_data
-    async_add_entities(
-        WatermarkSwitch(coordinator, camera, device)
-        for camera, device, _ in camera_devices(hass, coordinator)
+    async_add_camera_entities(
+        hass,
+        entry,
+        async_add_entities,
+        lambda camera, device, _: [WatermarkSwitch(coordinator, camera, device)],
     )
 
 

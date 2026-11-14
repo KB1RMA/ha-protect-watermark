@@ -89,7 +89,10 @@ class FakeProtect:
             if camera_id in self.get_error:
                 raise self.get_error[camera_id]
             if camera_id not in self.settings:
-                raise BadRequest("Camera does not support the overlay API")
+                raise BadRequest(
+                    f"Request failed: {url} - Status: 400 - Reason: "
+                    "Camera does not support the overlay API"
+                )
             return deepcopy(self.settings[camera_id])
         assert method == "patch"
         body: dict[str, Any] = kwargs["json"]
@@ -109,12 +112,22 @@ class FakeProtect:
         }
 
 
-def _camera(camera_id: str, mac: str, name: str, *, ours: bool = True) -> MagicMock:
+def make_camera(
+    camera_id: str,
+    mac: str,
+    name: str,
+    *,
+    ours: bool = True,
+    model: str = "G6 Bullet",
+    firmware: str = "5.4.23",
+) -> MagicMock:
     camera = MagicMock()
     camera.id = camera_id
     camera.mac = mac
     camera.name = name
     camera.is_adopted_by_us = ours
+    camera.market_name = model
+    camera.firmware_version = firmware
     return camera
 
 
@@ -137,10 +150,19 @@ def protect_api(fake_protect: FakeProtect) -> MagicMock:
     api = MagicMock(spec=ProtectApiClient)
     api.is_public_only = False
     api.api_request = AsyncMock(side_effect=fake_protect.api_request)
+    api.bootstrap.nvr.version = "7.2.105"
     api.bootstrap.cameras = {
-        OVERLAY_CAMERA_ID: _camera(OVERLAY_CAMERA_ID, OVERLAY_CAMERA_MAC, "Driveway"),
-        LEGACY_CAMERA_ID: _camera(LEGACY_CAMERA_ID, LEGACY_CAMERA_MAC, "Front Door"),
-        OTHER_NVR_CAMERA_ID: _camera(
+        OVERLAY_CAMERA_ID: make_camera(
+            OVERLAY_CAMERA_ID, OVERLAY_CAMERA_MAC, "Driveway"
+        ),
+        LEGACY_CAMERA_ID: make_camera(
+            LEGACY_CAMERA_ID,
+            LEGACY_CAMERA_MAC,
+            "Front Door",
+            model="G4 Doorbell",
+            firmware="4.74.106",
+        ),
+        OTHER_NVR_CAMERA_ID: make_camera(
             OTHER_NVR_CAMERA_ID, "F09FC2000002", "Not ours", ours=False
         ),
     }

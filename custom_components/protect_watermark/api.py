@@ -13,14 +13,19 @@ It isn't in the public Integration API as of Protect 7.2.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from http import HTTPStatus
+import re
 from typing import Any, cast
 
+from awesomeversion import AwesomeVersion
+from awesomeversion.exceptions import AwesomeVersionException
 from uiprotect import ProtectApiClient
+from uiprotect.exceptions import BadRequest
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
-from .const import PROTECT_DOMAIN
+from .const import MIN_PROTECT_VERSION, PROTECT_DOMAIN
 
 
 class ProtectUnavailableError(Exception):
@@ -33,11 +38,14 @@ class ProtectPublicOnlyError(Exception):
 
 @dataclass(slots=True, frozen=True)
 class OverlayCamera:
-    """A camera that supports the overlay API."""
+    """An adopted Protect camera."""
 
     id: str
     mac: str
     name: str
+    # Only used to explain why a camera has no watermark entities.
+    model: str | None = None
+    firmware: str | None = None
 
 
 def get_protect_client(hass: HomeAssistant, protect_entry_id: str) -> ProtectApiClient:
@@ -68,10 +76,55 @@ def get_protect_client(hass: HomeAssistant, protect_entry_id: str) -> ProtectApi
 def adopted_cameras(api: ProtectApiClient) -> list[OverlayCamera]:
     """Return the adopted cameras from the Protect integration's bootstrap."""
     return [
-        OverlayCamera(id=camera.id, mac=camera.mac, name=camera.name or camera.mac)
+        OverlayCamera(
+            id=camera.id,
+            mac=camera.mac,
+            name=camera.name or camera.mac,
+            model=camera.market_name,
+            firmware=camera.firmware_version,
+        )
         for camera in api.bootstrap.cameras.values()
         if camera.is_adopted_by_us
     ]
+
+
+def protect_version(api: ProtectApiClient) -> str:
+    """Return the console's UniFi Protect version."""
+    return str(api.bootstrap.nvr.version)
+
+
+def is_older(version: str | None, minimum: str) -> bool | None:
+    """Return whether a version is older than the minimum, or None if unknown."""
+    if not version:
+        return None
+    try:
+        return AwesomeVersion(version) < AwesomeVersion(minimum)
+    except AwesomeVersionException:
+        return None
+
+
+# uiprotect puts the HTTP status only in the message of the errors it raises.
+_STATUS = re.compile(r"Status: (\d{3})")
+
+
+def overlay_unsupported(err: BadRequest, protect_version: str) -> bool:
+    """Return whether an overlay read failed because the camera lacks the API.
+
+    Protect answers 400 for a camera without the overlay API. A Protect older
+    than the watermark has no route at all and answers 404, but a newer one
+    answers 404 for a camera that's just been removed, so a 404 only counts on
+    an old Protect. ``uiprotect`` raises ``BadRequest`` for every other 4xx
+    too (a camera that's updating, for one), and for errors that didn't come
+    from Protect's answer. Those leave it unknown, so they aren't counted.
+    """
+    if (match := _STATUS.search(str(err))) is None:
+        return False
+    status = int(match.group(1))
+    if status == HTTPStatus.BAD_REQUEST:
+        return True
+    return status == HTTPStatus.NOT_FOUND and bool(
+        is_older(protect_version, MIN_PROTECT_VERSION)
+    )
 
 
 async def get_overlay(api: ProtectApiClient, camera_id: str) -> dict[str, Any]:

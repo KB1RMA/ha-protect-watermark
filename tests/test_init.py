@@ -8,6 +8,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from uiprotect.exceptions import NotAuthorized, NvrError
 
 from custom_components.protect_watermark.const import DOMAIN, ISSUE_PUBLIC_ONLY
+from custom_components.protect_watermark.support import issue_id
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
@@ -58,15 +59,15 @@ async def test_public_only_raises_repair(
     protect_api.is_public_only = True
     await setup_integration(hass, config_entry)
     assert config_entry.state is ConfigEntryState.SETUP_ERROR
-    issue_id = f"{ISSUE_PUBLIC_ONLY}_{config_entry.entry_id}"
-    assert issue_registry.async_get_issue(DOMAIN, issue_id) is not None
+    public_only_issue = issue_id(ISSUE_PUBLIC_ONLY, config_entry)
+    assert issue_registry.async_get_issue(DOMAIN, public_only_issue) is not None
 
     # Once private access is back, a reload clears the issue.
     protect_api.is_public_only = False
     await hass.config_entries.async_reload(config_entry.entry_id)
     await hass.async_block_till_done()
     assert config_entry.state is ConfigEntryState.LOADED
-    assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
+    assert issue_registry.async_get_issue(DOMAIN, public_only_issue) is None
 
 
 async def test_remove_clears_repair(
@@ -79,8 +80,8 @@ async def test_remove_clears_repair(
     protect_api.is_public_only = True
     await setup_integration(hass, config_entry)
     await hass.config_entries.async_remove(config_entry.entry_id)
-    issue_id = f"{ISSUE_PUBLIC_ONLY}_{config_entry.entry_id}"
-    assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
+    public_only_issue = issue_id(ISSUE_PUBLIC_ONLY, config_entry)
+    assert issue_registry.async_get_issue(DOMAIN, public_only_issue) is None
 
 
 async def test_discovery_not_authorized(

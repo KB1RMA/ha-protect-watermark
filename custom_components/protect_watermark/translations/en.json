@@ -47,6 +47,10 @@
     "protect_public_only": {
       "title": "UniFi Protect has no private API access",
       "description": "UniFi Protect Watermark sets the watermark through Protect's private API, using the UniFi Protect integration's sign-in. That integration is set up with an API key only, or no longer uses a username and password, so the watermark can't be changed.\n\nReconfigure the UniFi Protect integration with a local username and password, then reload UniFi Protect Watermark."
+    },
+    "no_supported_cameras": {
+      "title": "No cameras support the visible watermark",
+      "description": "None of the cameras on {console} support UniFi Protect's visible watermark, so UniFi Protect Watermark has no entities to add.\n\nThe visible watermark needs UniFi Protect {min_protect_version} or newer, camera firmware {min_firmware} or newer, and a camera model that supports it, such as the G6 series.\n\nUniFi Protect: {protect_version}\n\nCameras:\n{cameras}\n\nIf UniFi Protect, or the firmware of a camera model that supports the watermark, is out of date, update it in UniFi Protect, then reload UniFi Protect Watermark. This message goes away once a camera supports the watermark."
     }
   }
 }
