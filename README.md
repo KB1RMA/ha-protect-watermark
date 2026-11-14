@@ -12,16 +12,31 @@ camera devices. Set the entity from an automation, and the text appears on the c
 - **No sign-in of its own.** It reuses the signed-in client of Home Assistant's built-in
   [UniFi Protect integration](https://www.home-assistant.io/integrations/unifiprotect/). There are no
   credentials to enter and nothing extra to secure.
-- **Entities go on your existing cameras.** Each overlay-capable camera gets up to four `text` entities, one
-  per corner, on the device UniFi Protect already created. Only **Watermark top right** is enabled by default.
-  Top left normally holds Protect's own `{Datetime} {CameraName}`.
-- **Changes only what you set.** Setting a corner sends just that corner to Protect, and it's saved, not shown
-  as a temporary preview. Setting the same text again sends nothing.
-- **Reads changes made in Protect.** The current text is polled every 5 minutes, so edits made in the Protect
-  UI show up in Home Assistant.
+- **Entities go on your existing cameras.** They're added to the device UniFi Protect already created, as
+  configuration entities.
+- **Changes only what you set.** Each change sends just that setting to Protect, and it's saved, not shown as
+  a temporary preview. Protect is read first, so a value it already has isn't sent again.
+- **Reads changes made in Protect.** Settings are polled every minute, so edits made in the Protect UI, such
+  as moving text to another corner, show up in Home Assistant.
 
-Protect placeholders such as `{Datetime}`, `{CameraName}`, `{Resolution}` and `{Bitrate}` are passed through,
-so you can mix them with your own text. An empty value clears the corner.
+## Entities
+
+Each overlay-capable camera gets:
+
+| Entity | Type | Protect setting | Enabled by default |
+|---|---|---|---|
+| **Watermark** | switch | Shows or hides the whole watermark (`enable`) | Yes |
+| **Watermark top left**, **top right**, **bottom left**, **bottom right** | text | The text in each corner | Yes |
+| **Watermark date format** | text | The `strftime` format of `{Datetime}`, such as `%Y-%m-%d %r` | No |
+| **Watermark area** | sensor (diagnostic) | How much of the picture the watermark covers, in percent (`overlayAreaPercent`). Protect works it out from the text, up to a limit of 20% on current cameras. | No |
+
+Top left normally holds Protect's own `{Datetime} {CameraName}`. An empty value clears a corner.
+
+These Protect placeholders are passed through, so you can mix them with your own text: `{Datetime}`,
+`{CameraName}`, `{Resolution}`, `{Width}`, `{Height}`, `{Codec}`, `{Bitrate}`, `{BitrateFull}`, `{ULogo}` and
+`{CustomLogo}`.
+
+The custom logo image itself can only be uploaded in Protect.
 
 ## Requirements
 

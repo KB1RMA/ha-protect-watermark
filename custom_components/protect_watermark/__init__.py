@@ -11,7 +11,11 @@ from .api import ProtectPublicOnlyError, ProtectUnavailableError, get_protect_cl
 from .const import CONF_PROTECT_ENTRY_ID, DOMAIN, ISSUE_PUBLIC_ONLY
 from .coordinator import OverlayCoordinator, ProtectWatermarkConfigEntry
 
-PLATFORMS: list[Platform] = [Platform.TEXT]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.TEXT,
+]
 
 
 async def async_setup_entry(

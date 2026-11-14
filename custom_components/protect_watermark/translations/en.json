@@ -15,11 +15,32 @@
     }
   },
   "entity": {
+    "sensor": {
+      "watermark_area": {
+        "name": "Watermark area"
+      }
+    },
+    "switch": {
+      "watermark": {
+        "name": "Watermark"
+      }
+    },
     "text": {
-      "watermark_top_left": { "name": "Watermark top left" },
-      "watermark_top_right": { "name": "Watermark top right" },
-      "watermark_bottom_left": { "name": "Watermark bottom left" },
-      "watermark_bottom_right": { "name": "Watermark bottom right" }
+      "watermark_top_left": {
+        "name": "Watermark top left"
+      },
+      "watermark_top_right": {
+        "name": "Watermark top right"
+      },
+      "watermark_bottom_left": {
+        "name": "Watermark bottom left"
+      },
+      "watermark_bottom_right": {
+        "name": "Watermark bottom right"
+      },
+      "watermark_datetime_format": {
+        "name": "Watermark date format"
+      }
     }
   },
   "issues": {

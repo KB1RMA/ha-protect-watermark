@@ -26,6 +26,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .conftest import (
+    DATETIME_FORMAT,
     OVERLAY_CAMERA_ID,
     OVERLAY_CAMERA_MAC,
     TOP_LEFT,
@@ -36,7 +37,7 @@ from .conftest import (
     setup_integration,
 )
 
-POLL = timedelta(minutes=5, seconds=1)
+POLL = timedelta(minutes=1, seconds=1)
 
 
 async def set_value(hass: HomeAssistant, entity_id: str, value: str) -> None:
@@ -47,6 +48,19 @@ async def set_value(hass: HomeAssistant, entity_id: str, value: str) -> None:
         {ATTR_ENTITY_ID: entity_id, ATTR_VALUE: value},
         blocking=True,
     )
+
+
+def corner_entries(
+    entity_registry: er.EntityRegistry, config_entry: MockConfigEntry
+) -> list[er.RegistryEntry]:
+    """Return the corner text entities of the config entry."""
+    return [
+        entry
+        for entry in er.async_entries_for_config_entry(
+            entity_registry, config_entry.entry_id
+        )
+        if entry.domain == "text" and "datetime" not in entry.unique_id
+    ]
 
 
 async def test_entities(
@@ -60,15 +74,17 @@ async def test_entities(
     await setup_integration(hass, config_entry)
 
     entries = er.async_entries_for_config_entry(entity_registry, config_entry.entry_id)
-    assert sorted(entry.unique_id for entry in entries) == [
+    texts = [entry for entry in entries if entry.domain == "text"]
+    assert sorted(entry.unique_id for entry in texts) == [
         f"{OVERLAY_CAMERA_MAC}_watermark_bottom_left",
         f"{OVERLAY_CAMERA_MAC}_watermark_bottom_right",
+        f"{OVERLAY_CAMERA_MAC}_watermark_datetime_format",
         f"{OVERLAY_CAMERA_MAC}_watermark_top_left",
         f"{OVERLAY_CAMERA_MAC}_watermark_top_right",
     ]
-    # Only the top-right corner is enabled by default.
-    enabled = [entry.entity_id for entry in entries if entry.disabled_by is None]
-    assert enabled == [TOP_RIGHT]
+    # All four corners are enabled by default; the date format isn't.
+    disabled = [entry.entity_id for entry in texts if entry.disabled_by is not None]
+    assert disabled == [DATETIME_FORMAT]
 
     device = device_registry.async_get_device_by_connection(
         (dr.CONNECTION_NETWORK_MAC, dr.format_mac(OVERLAY_CAMERA_MAC)),
@@ -90,15 +106,10 @@ async def test_entities(
 
 
 async def test_top_left_reads_existing_text(
-    hass: HomeAssistant,
-    config_entry: MockConfigEntry,
-    entity_registry: er.EntityRegistry,
+    hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
-    """A corner enabled by the user shows Protect's text."""
+    """A corner shows Protect's text."""
     await setup_integration(hass, config_entry)
-    entity_registry.async_update_entity(TOP_LEFT, disabled_by=None)
-    await hass.config_entries.async_reload(config_entry.entry_id)
-    await hass.async_block_till_done()
 
     state = hass.states.get(TOP_LEFT)
     assert state is not None
@@ -132,6 +143,94 @@ async def test_same_value_is_not_sent(
     await setup_integration(hass, config_entry)
     await set_value(hass, TOP_RIGHT, "41°F")
     assert fake_protect.patches == []
+
+
+async def test_value_matching_stale_data_is_sent(
+    hass: HomeAssistant, fake_protect: FakeProtect, config_entry: MockConfigEntry
+) -> None:
+    """Protect is read before skipping, so a change made since the poll isn't missed."""
+    fake_protect.settings[OVERLAY_CAMERA_ID] = overlay_settings(
+        topRight={"content": "41°F", "orientation": "horizontal"}
+    )
+    await setup_integration(hass, config_entry)
+    # Moved to another corner in the Protect UI since the last poll.
+    fake_protect.settings[OVERLAY_CAMERA_ID] = overlay_settings(
+        bottomRight={"content": "41°F", "orientation": "horizontal"}
+    )
+    await set_value(hass, TOP_RIGHT, "41°F")
+
+    assert fake_protect.patches == [
+        (
+            OVERLAY_CAMERA_ID,
+            {"topRight": {"content": "41°F"}, "preview": False},
+        )
+    ]
+    state = hass.states.get("text.driveway_watermark_bottom_right")
+    assert state is not None
+    assert state.state == "41°F"
+
+
+async def test_set_value_keeps_orientation(
+    hass: HomeAssistant, fake_protect: FakeProtect, config_entry: MockConfigEntry
+) -> None:
+    """Changing a corner's text keeps its orientation."""
+    fake_protect.settings[OVERLAY_CAMERA_ID] = overlay_settings(
+        topRight={"content": "41°F", "orientation": "vertical"}
+    )
+    await setup_integration(hass, config_entry)
+    await set_value(hass, TOP_RIGHT, "42°F")
+    assert fake_protect.patches == [
+        (
+            OVERLAY_CAMERA_ID,
+            {
+                "topRight": {"content": "42°F", "orientation": "vertical"},
+                "preview": False,
+            },
+        )
+    ]
+
+
+async def test_read_error_before_write(
+    hass: HomeAssistant, fake_protect: FakeProtect, config_entry: MockConfigEntry
+) -> None:
+    """A failed read before a write is raised and nothing is sent."""
+    await setup_integration(hass, config_entry)
+    fake_protect.get_error[OVERLAY_CAMERA_ID] = NvrError("offline")
+    with pytest.raises(HomeAssistantError, match="Couldn't set the watermark"):
+        await set_value(hass, TOP_RIGHT, "41°F")
+    assert fake_protect.patches == []
+
+
+async def test_datetime_format(
+    hass: HomeAssistant,
+    fake_protect: FakeProtect,
+    config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """The date format reads and writes Protect's datetimeFormat."""
+    await setup_integration(hass, config_entry)
+    entity_registry.async_update_entity(DATETIME_FORMAT, disabled_by=None)
+    await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(DATETIME_FORMAT)
+    assert state is not None
+    assert state.state == "%Y-%m-%d  %r"
+
+    await set_value(hass, DATETIME_FORMAT, "%H:%M")
+    assert fake_protect.patches == [
+        (OVERLAY_CAMERA_ID, {"datetimeFormat": "%H:%M", "preview": False})
+    ]
+    state = hass.states.get(DATETIME_FORMAT)
+    assert state is not None
+    assert state.state == "%H:%M"
+
+    fake_protect.settings[OVERLAY_CAMERA_ID]["datetimeFormat"] = None
+    await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    state = hass.states.get(DATETIME_FORMAT)
+    assert state is not None
+    assert state.state == "unknown"
 
 
 async def test_empty_value_clears_corner(
@@ -317,8 +416,7 @@ async def test_missing_capabilities(
     settings["capabilities"] = None
     fake_protect.settings[OVERLAY_CAMERA_ID] = settings
     await setup_integration(hass, config_entry)
-    entries = er.async_entries_for_config_entry(entity_registry, config_entry.entry_id)
-    assert len(entries) == 4
+    assert len(corner_entries(entity_registry, config_entry)) == 4
     state = hass.states.get(TOP_RIGHT)
     assert state is not None
     assert state.attributes[ATTR_MAX] == 255
@@ -336,8 +434,7 @@ async def test_small_capabilities(
     settings["capabilities"]["maxContentLength"] = 32
     fake_protect.settings[OVERLAY_CAMERA_ID] = settings
     await setup_integration(hass, config_entry)
-    entries = er.async_entries_for_config_entry(entity_registry, config_entry.entry_id)
-    assert len(entries) == 2
+    assert len(corner_entries(entity_registry, config_entry)) == 2
     state = hass.states.get(TOP_RIGHT)
     assert state is not None
     assert state.attributes[ATTR_MAX] == 32
@@ -389,6 +486,19 @@ async def test_camera_without_device_is_skipped(
     )
     protect_api.bootstrap.cameras[orphan].name = "Shed"
     await setup_integration(hass, config_entry)
-    entries = er.async_entries_for_config_entry(entity_registry, config_entry.entry_id)
-    assert len(entries) == 4
+    assert len(corner_entries(entity_registry, config_entry)) == 4
     assert "Skipping Shed" in caplog.text
+
+
+async def test_set_value_corner_without_orientation(
+    hass: HomeAssistant, fake_protect: FakeProtect, config_entry: MockConfigEntry
+) -> None:
+    """A corner Protect stored without an orientation is sent without one."""
+    fake_protect.settings[OVERLAY_CAMERA_ID] = overlay_settings(
+        topRight={"content": "41°F"}
+    )
+    await setup_integration(hass, config_entry)
+    await set_value(hass, TOP_RIGHT, "42°F")
+    assert fake_protect.patches == [
+        (OVERLAY_CAMERA_ID, {"topRight": {"content": "42°F"}, "preview": False})
+    ]

@@ -30,6 +30,9 @@ OTHER_NVR_CAMERA_ID = "cam-other-nvr"
 
 TOP_RIGHT = "text.driveway_watermark_top_right"
 TOP_LEFT = "text.driveway_watermark_top_left"
+DATETIME_FORMAT = "text.driveway_watermark_date_format"
+WATERMARK_SWITCH = "switch.driveway_watermark"
+AREA = "sensor.driveway_watermark_area"
 
 
 def overlay_settings(**corners: dict[str, str] | None) -> dict[str, Any]:

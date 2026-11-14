@@ -87,20 +87,19 @@ async def get_overlay(api: ProtectApiClient, camera_id: str) -> dict[str, Any]:
     return data
 
 
-async def set_corner(
-    api: ProtectApiClient, camera_id: str, corner: str, content: str | None
+async def patch_overlay(
+    api: ProtectApiClient, camera_id: str, changes: dict[str, Any]
 ) -> dict[str, Any]:
-    """Set one corner of a camera's overlay and return the new settings.
+    """Change a camera's overlay settings and return the new settings.
 
     The per-camera route merges the body into the stored settings, so only the
-    given corner changes. ``None`` clears the corner. ``preview: false`` saves
-    the change instead of showing a temporary preview.
+    given keys change. A corner set to ``None`` is cleared. ``preview: false``
+    saves the change instead of showing a temporary preview.
     """
-    value: dict[str, Any] | None = None if content is None else {"content": content}
     data = await api.api_request(
         f"cameras/{camera_id}/overlay-settings",
         method="patch",
-        json={corner: value, "preview": False},
+        json={**changes, "preview": False},
     )
     settings = data.get("settings") if isinstance(data, dict) else None
     if not isinstance(settings, dict):

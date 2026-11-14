@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 from typing import Any, cast, override
 
@@ -20,7 +21,7 @@ from .api import (
     adopted_cameras,
     get_overlay,
     get_protect_client,
-    set_corner,
+    patch_overlay,
 )
 from .const import CONF_PROTECT_ENTRY_ID, DOMAIN, SCAN_INTERVAL
 
@@ -111,13 +112,54 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
     async def async_set_corner(
         self, camera_id: str, corner: str, content: str | None
     ) -> None:
-        """Set one corner of a camera's overlay, skipping writes that change nothing."""
-        current = (self.data or {}).get(camera_id)
-        if current is not None and corner_content(current, corner) == (content or ""):
-            return
+        """Set one corner's text. ``None`` clears it.
+
+        Protect stores an orientation for each corner, which its UI doesn't
+        show. It's sent back unchanged so a write doesn't reset it.
+        """
+
+        def changes(settings: dict[str, Any]) -> dict[str, Any] | None:
+            if corner_content(settings, corner) == (content or ""):
+                return None
+            if content is None:
+                return {corner: None}
+            value: dict[str, Any] = {"content": content}
+            if (orientation := corner_orientation(settings, corner)) is not None:
+                value["orientation"] = orientation
+            return {corner: value}
+
+        await self._async_patch(camera_id, changes)
+
+    async def async_set_setting(
+        self, camera_id: str, key: str, *, value: bool | float | str
+    ) -> None:
+        """Set one top-level overlay setting, such as ``enable``."""
+
+        def changes(settings: dict[str, Any]) -> dict[str, Any] | None:
+            if settings.get(key) == value and type(settings.get(key)) is type(value):
+                return None
+            return {key: value}
+
+        await self._async_patch(camera_id, changes)
+
+    async def _async_patch(
+        self,
+        camera_id: str,
+        changes: Callable[[dict[str, Any]], dict[str, Any] | None],
+    ) -> None:
+        """Write overlay changes, skipping the write when Protect already has them.
+
+        ``changes`` gets Protect's current settings and returns the body to
+        send, or ``None`` when nothing would change.
+
+        Protect is read first rather than trusting the last poll, so a change
+        made in the Protect UI since then isn't mistaken for no change.
+        """
         try:
             api = self.client()
-            settings = await set_corner(api, camera_id, corner, content)
+            settings = await get_overlay(api, camera_id)
+            if (body := changes(settings)) is not None:
+                settings = await patch_overlay(api, camera_id, body)
         except (ProtectUnavailableError, ProtectPublicOnlyError) as err:
             raise HomeAssistantError(
                 "The UniFi Protect integration isn't available"
@@ -141,3 +183,13 @@ def corner_content(settings: dict[str, Any], corner: str) -> str:
         if isinstance(content, str):
             return content
     return ""
+
+
+def corner_orientation(settings: dict[str, Any], corner: str) -> str | None:
+    """Return a corner's orientation, or ``None`` when the corner is empty."""
+    value: object = settings.get(corner)
+    if isinstance(value, dict):
+        orientation: object = cast("dict[str, object]", value).get("orientation")
+        if isinstance(orientation, str):
+            return orientation
+    return None
