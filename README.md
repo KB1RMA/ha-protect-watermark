@@ -17,6 +17,16 @@ released on 3 August 2026, added Evidence Trust and visible watermarks. Each cam
 corner of that watermark to your existing UniFi Protect camera devices. Set the entity from an automation, and
 the text appears on the camera.
 
+![The top-right corner of a G6 Bullet's picture, with the outdoor temperature, 45°F, in the watermark](https://raw.githubusercontent.com/KB1RMA/ha-protect-watermark/main/docs/images/watermark-top-right.jpg)
+
+Protect's UI calls this the *visible watermark*, and its API calls it the *overlay*. Both names mean the same
+thing here.
+
+> [!IMPORTANT]
+> Your UniFi Protect integration must be signed in with a **local username and password**. An API-key-only
+> setup can't change the watermark: this integration won't load, and a repair under **Settings → Repairs**
+> says why. See [Requirements](#requirements).
+
 ## How it works
 
 - **No sign-in of its own.** It reuses the signed-in client of Home Assistant's built-in
@@ -31,7 +41,7 @@ the text appears on the camera.
 
 ## Entities
 
-Each overlay-capable camera gets:
+Each camera that supports the visible watermark gets:
 
 | Entity | Type | Protect setting | Enabled by default |
 |---|---|---|---|
@@ -58,7 +68,13 @@ The custom logo image itself can only be uploaded in Protect.
   Doorbell, for example) only have the legacy name, date and logo toggles, and get no entities.
 - The UniFi Protect integration, set up with a **local username and password** (not only an API key). The
   watermark is only on Protect's private API, so a public-API-only setup can't change it. That user needs
-  permission to edit camera settings.
+  permission to edit camera settings. With an API key only, this integration fails to load and shows the
+  repair "UniFi Protect has no private API access". If UniFi Protect isn't loaded at all, adding this
+  integration stops with "Set up the UniFi Protect integration first".
+
+If none of your cameras qualifies, the integration still loads, and a repair under **Settings → Repairs**
+lists each camera and its firmware against these minimums. A camera that can't be read yet, because it's
+offline for example, is retried rather than judged.
 
 ## Installation
 
@@ -90,7 +106,47 @@ there's nothing to fill in. With more than one, pick the console.
 
 Cameras added to Protect later get their entities after you reload the integration.
 
-## Example: outdoor temperature in the top-right corner
+## Quick start: outdoor temperature in the top-right corner
+
+This automation writes the temperature to one camera whenever it changes. Replace
+`sensor.outdoor_temperature` (it appears three times) and `text.driveway_watermark_top_right` with your own
+entity IDs.
+
+```yaml
+alias: Camera watermark temperature (quick start)
+mode: queued
+max: 2
+max_exceeded: silent
+triggers:
+  - trigger: state
+    entity_id: sensor.outdoor_temperature
+    to: null
+conditions:
+  - condition: numeric_state
+    entity_id: sensor.outdoor_temperature
+    above: -100
+actions:
+  - action: text.set_value
+    target:
+      entity_id: text.driveway_watermark_top_right
+    data:
+      value: "{{ states('sensor.outdoor_temperature') | float | round(0) | int }}°F"
+```
+
+The `numeric_state` condition skips `unavailable` and `unknown`, so those never reach the video. `queued`
+keeps a reading that arrives during a write instead of dropping it (see **Queueing** below). For
+Celsius, change `°F` to `°C`. You can test the entity without an automation: open it in Home Assistant, type
+some text and check the camera's live view.
+
+## Full example: several cameras, with stale-reading handling
+
+The quick start keeps showing the last temperature if the sensor stops reporting. Because the watermark is
+burned into recordings, you may prefer to show `--°F` instead. This version does that, and updates every
+camera at once. It replaces the quick start, so delete that automation first, or both will write to the same
+camera.
+
+First, add a `camera_watermark` label to each **Watermark top right** entity you want updated (open the
+entity → settings → **Labels**). The automation targets that label rather than individual entities.
 
 ```yaml
 alias: Camera watermark temperature
@@ -135,7 +191,7 @@ actions:
               value: "{{ states('sensor.outdoor_temperature') | float | round(0) | int }}°F"
 ```
 
-Add the `camera_watermark` label to each **Watermark top right** entity you want updated.
+How it works:
 
 - **Readings.** `to: null` fires on state changes only, not attribute updates. The `numeric_state` condition
   skips `unavailable`, `unknown` and other non-numeric states.
