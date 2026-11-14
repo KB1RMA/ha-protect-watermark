@@ -101,5 +101,5 @@ def describe_camera(camera: OverlayCamera, *, protect_too_old: bool = False) -> 
             "or this model doesn't support it"
         )
     if older is None:
-        return f"{name}: firmware {firmware}, not supported by Protect"
+        return f"{name}: firmware {firmware}, may not support it"
     return f"{name}: firmware {firmware}, this model doesn't support it"

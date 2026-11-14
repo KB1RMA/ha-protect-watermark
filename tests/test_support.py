@@ -26,6 +26,7 @@ from .conftest import (
     LEGACY_CAMERA_ID,
     OVERLAY_CAMERA_ID,
     FakeProtect,
+    _camera,
     overlay_settings,
     setup_integration,
 )
@@ -116,19 +117,83 @@ async def test_issue_with_old_protect(
     )
 
 
-async def test_other_client_errors_retry(
+async def test_other_client_errors_skip_the_camera(
+    hass: HomeAssistant,
+    fake_protect: FakeProtect,
+    config_entry: MockConfigEntry,
+    issue_registry: ir.IssueRegistry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A 4xx other than 400 or 404 skips that camera, not the others."""
+    fake_protect.get_error[LEGACY_CAMERA_ID] = BadRequest(
+        "Request failed: x - Status: 409 - Reason: Camera is updating"
+    )
+    await setup_integration(hass, config_entry)
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert set(config_entry.runtime_data.cameras) == {OVERLAY_CAMERA_ID}
+    assert "Couldn't read the overlay of Front Door; reload" in caplog.text
+    assert issue_registry.async_get_issue(DOMAIN, _issue(config_entry)) is None
+
+
+async def test_other_client_errors_retry_without_a_supported_camera(
     hass: HomeAssistant,
     fake_protect: FakeProtect,
     config_entry: MockConfigEntry,
     issue_registry: ir.IssueRegistry,
 ) -> None:
-    """A 4xx other than 400 or 404 retries instead of marking a camera unsupported."""
+    """With no supported camera, a camera that may support it is waited on."""
+    fake_protect.settings.clear()
     fake_protect.get_error[LEGACY_CAMERA_ID] = BadRequest(
         "Request failed: x - Status: 409 - Reason: Camera is updating"
     )
     await setup_integration(hass, config_entry)
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
     assert issue_registry.async_get_issue(DOMAIN, _issue(config_entry)) is None
+
+
+async def test_several_skipped_cameras_are_named(
+    hass: HomeAssistant,
+    protect_api: MagicMock,
+    fake_protect: FakeProtect,
+    config_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The warning names every skipped camera."""
+    protect_api.bootstrap.cameras["cam3"] = _camera("cam3", "CC", "Garage")
+    error = BadRequest("Request failed: x - Status: 409 - Reason: Camera is updating")
+    fake_protect.get_error[LEGACY_CAMERA_ID] = error
+    fake_protect.get_error["cam3"] = error
+    await setup_integration(hass, config_entry)
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert "Front Door, Garage; reload" in caplog.text
+    assert "to add them once they're available" in caplog.text
+
+
+async def test_removed_camera_isnt_unsupported(
+    hass: HomeAssistant,
+    protect_api: MagicMock,
+    fake_protect: FakeProtect,
+    config_entry: MockConfigEntry,
+    issue_registry: ir.IssueRegistry,
+) -> None:
+    """A camera removed from Protect during discovery isn't reported."""
+    fake_protect.settings.clear()
+    cameras = protect_api.bootstrap.cameras
+
+    async def remove_and_404(url: str, method: str = "get", **kwargs: object) -> None:
+        camera_id = url.split("/")[1]
+        if camera_id == LEGACY_CAMERA_ID:
+            del cameras[LEGACY_CAMERA_ID]
+            raise BadRequest(f"Request failed: {url} - Status: 404 - Reason: Not Found")
+        raise BadRequest(f"Request failed: {url} - Status: 400 - Reason: no overlay")
+
+    protect_api.api_request.side_effect = remove_and_404
+    await setup_integration(hass, config_entry)
+    issue = issue_registry.async_get_issue(DOMAIN, _issue(config_entry))
+    assert issue is not None
+    assert issue.translation_placeholders is not None
+    assert "Front Door" not in issue.translation_placeholders["cameras"]
+    assert "Driveway" in issue.translation_placeholders["cameras"]
 
 
 async def test_issue_removed_on_unload(
@@ -208,11 +273,11 @@ def test_describe_protect(version: str, expected: str) -> None:
         ),
         (
             OverlayCamera("1", "AA", "Porch"),
-            "Porch: firmware unknown, not supported by Protect",
+            "Porch: firmware unknown, may not support it",
         ),
         (
             OverlayCamera("1", "AA", "Porch", None, "beta-build"),
-            "Porch: firmware beta-build, not supported by Protect",
+            "Porch: firmware beta-build, may not support it",
         ),
     ],
 )

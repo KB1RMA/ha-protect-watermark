@@ -93,6 +93,9 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
     async def _async_discover(self, api: ProtectApiClient) -> OverlayData:
         data: OverlayData = {}
         unsupported: list[OverlayCamera] = []
+        # Cameras that turned the request down for another reason (one that's
+        # updating, for example). It's not known whether they support it.
+        skipped: list[OverlayCamera] = []
         for camera in adopted_cameras(api):
             try:
                 settings = await get_overlay(api, camera.id)
@@ -101,10 +104,15 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
                     "The UniFi Protect user can't read camera settings"
                 ) from err
             except BadRequest as err:
+                if camera.id not in api.bootstrap.cameras:
+                    _LOGGER.debug("%s was removed from Protect", camera.name)
+                    continue
                 if not overlay_unsupported(err):
-                    raise UpdateFailed(
-                        f"Couldn't read the overlay of {camera.name}: {err}"
-                    ) from err
+                    _LOGGER.debug(
+                        "Couldn't read the overlay of %s: %s", camera.name, err
+                    )
+                    skipped.append(camera)
+                    continue
                 # Older cameras only have the legacy OSD (name, date, logo).
                 _LOGGER.debug("%s doesn't support the overlay API", camera.name)
                 unsupported.append(camera)
@@ -115,6 +123,19 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
                 ) from err
             self.cameras[camera.id] = camera
             data[camera.id] = settings
+        if skipped and not self.cameras:
+            # With nothing to show yet, retry until those cameras answer.
+            names = ", ".join(camera.name for camera in skipped)
+            raise UpdateFailed(f"Couldn't read the overlay of {names}")
+        if skipped:
+            # The other cameras shouldn't wait on these.
+            _LOGGER.warning(
+                "Couldn't read the overlay of %s; reload UniFi Protect Watermark "
+                "to add %s once %s available",
+                ", ".join(camera.name for camera in skipped),
+                "it" if len(skipped) == 1 else "them",
+                "it's" if len(skipped) == 1 else "they're",
+            )
         self._discovered = True
         async_update_support_issue(
             self.hass,
