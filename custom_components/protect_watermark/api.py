@@ -17,13 +17,15 @@ from http import HTTPStatus
 import re
 from typing import Any, cast
 
+from awesomeversion import AwesomeVersion
+from awesomeversion.exceptions import AwesomeVersionException
 from uiprotect import ProtectApiClient
 from uiprotect.exceptions import BadRequest
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
-from .const import PROTECT_DOMAIN
+from .const import MIN_PROTECT_VERSION, PROTECT_DOMAIN
 
 
 class ProtectUnavailableError(Exception):
@@ -91,22 +93,38 @@ def protect_version(api: ProtectApiClient) -> str:
     return str(api.bootstrap.nvr.version)
 
 
+def is_older(version: str | None, minimum: str) -> bool | None:
+    """Return whether a version is older than the minimum, or None if unknown."""
+    if not version:
+        return None
+    try:
+        return AwesomeVersion(version) < AwesomeVersion(minimum)
+    except AwesomeVersionException:
+        return None
+
+
 # uiprotect puts the HTTP status only in the message of the errors it raises.
 _STATUS = re.compile(r"Status: (\d{3})")
 
 
-def overlay_unsupported(err: BadRequest) -> bool:
-    """Return whether an overlay read failed because the API isn't there.
+def overlay_unsupported(err: BadRequest, protect_version: str) -> bool:
+    """Return whether an overlay read failed because the camera lacks the API.
 
-    Protect answers 400 for a camera without the overlay API, and a version
-    without the route answers 404. ``uiprotect`` raises ``BadRequest`` for
-    every other 4xx too (a camera that's updating, for one), and those
-    shouldn't be read as the camera lacking the watermark. An error without a
-    status didn't come from Protect's answer, so it's taken as unsupported.
+    Protect answers 400 for a camera without the overlay API. A Protect older
+    than the watermark has no route at all and answers 404, but a newer one
+    answers 404 for a camera that's just been removed, so a 404 only counts on
+    an old Protect. ``uiprotect`` raises ``BadRequest`` for every other 4xx
+    too (a camera that's updating, for one), and for errors that didn't come
+    from Protect's answer. Those leave it unknown, so they aren't counted.
     """
     if (match := _STATUS.search(str(err))) is None:
+        return False
+    status = int(match.group(1))
+    if status == HTTPStatus.BAD_REQUEST:
         return True
-    return int(match.group(1)) in (HTTPStatus.BAD_REQUEST, HTTPStatus.NOT_FOUND)
+    return status == HTTPStatus.NOT_FOUND and bool(
+        is_older(protect_version, MIN_PROTECT_VERSION)
+    )
 
 
 async def get_overlay(api: ProtectApiClient, camera_id: str) -> dict[str, Any]:

@@ -112,7 +112,7 @@ class FakeProtect:
         }
 
 
-def _camera(
+def make_camera(
     camera_id: str,
     mac: str,
     name: str,
@@ -152,15 +152,17 @@ def protect_api(fake_protect: FakeProtect) -> MagicMock:
     api.api_request = AsyncMock(side_effect=fake_protect.api_request)
     api.bootstrap.nvr.version = "7.2.105"
     api.bootstrap.cameras = {
-        OVERLAY_CAMERA_ID: _camera(OVERLAY_CAMERA_ID, OVERLAY_CAMERA_MAC, "Driveway"),
-        LEGACY_CAMERA_ID: _camera(
+        OVERLAY_CAMERA_ID: make_camera(
+            OVERLAY_CAMERA_ID, OVERLAY_CAMERA_MAC, "Driveway"
+        ),
+        LEGACY_CAMERA_ID: make_camera(
             LEGACY_CAMERA_ID,
             LEGACY_CAMERA_MAC,
             "Front Door",
             model="G4 Doorbell",
             firmware="4.74.106",
         ),
-        OTHER_NVR_CAMERA_ID: _camera(
+        OTHER_NVR_CAMERA_ID: make_camera(
             OTHER_NVR_CAMERA_ID, "F09FC2000002", "Not ours", ours=False
         ),
     }

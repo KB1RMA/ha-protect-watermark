@@ -10,7 +10,7 @@ from uiprotect import ProtectApiClient
 from uiprotect.exceptions import BadRequest, ClientError, NotAuthorized
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -26,7 +26,7 @@ from .api import (
     protect_version,
 )
 from .const import CONF_PROTECT_ENTRY_ID, DOMAIN, SCAN_INTERVAL
-from .support import async_update_support_issue
+from .support import async_delete_support_issue, async_update_support_issue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,7 +53,14 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
         # Found on the first refresh. Cameras added to Protect later appear
         # after this integration is reloaded.
         self.cameras: dict[str, OverlayCamera] = {}
+        # Cameras that turned the overlay down for a reason other than lacking
+        # it (one that's updating, for example). They're tried again on each
+        # refresh, and join self.cameras once they answer.
+        self.pending: dict[str, OverlayCamera] = {}
+        self.unsupported: dict[str, OverlayCamera] = {}
+        self._protect_version = ""
         self._discovered = False
+        self._camera_listeners: list[Callable[[OverlayData], None]] = []
 
     def client(self) -> ProtectApiClient:
         """Return the UniFi Protect integration's client."""
@@ -88,14 +95,26 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
                 failures += 1
         if self.cameras and failures == len(self.cameras):
             raise UpdateFailed("Couldn't read the overlay of any camera")
+        if self.pending:
+            await self._async_retry_pending(api, data)
         return data
+
+    @callback
+    def async_add_camera_listener(
+        self, listener: Callable[[OverlayData], None]
+    ) -> Callable[[], None]:
+        """Call ``listener`` with the settings of cameras found after setup."""
+        self._camera_listeners.append(listener)
+
+        @callback
+        def remove() -> None:
+            self._camera_listeners.remove(listener)
+
+        return remove
 
     async def _async_discover(self, api: ProtectApiClient) -> OverlayData:
         data: OverlayData = {}
-        unsupported: list[OverlayCamera] = []
-        # Cameras that turned the request down for another reason (one that's
-        # updating, for example). It's not known whether they support it.
-        skipped: list[OverlayCamera] = []
+        self._protect_version = protect_version(api)
         for camera in adopted_cameras(api):
             try:
                 settings = await get_overlay(api, camera.id)
@@ -104,18 +123,7 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
                     "The UniFi Protect user can't read camera settings"
                 ) from err
             except BadRequest as err:
-                if camera.id not in api.bootstrap.cameras:
-                    _LOGGER.debug("%s was removed from Protect", camera.name)
-                    continue
-                if not overlay_unsupported(err):
-                    _LOGGER.debug(
-                        "Couldn't read the overlay of %s: %s", camera.name, err
-                    )
-                    skipped.append(camera)
-                    continue
-                # Older cameras only have the legacy OSD (name, date, logo).
-                _LOGGER.debug("%s doesn't support the overlay API", camera.name)
-                unsupported.append(camera)
+                self._sort_rejected(api, camera, err)
                 continue
             except (ClientError, TypeError) as err:
                 raise UpdateFailed(
@@ -123,28 +131,74 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
                 ) from err
             self.cameras[camera.id] = camera
             data[camera.id] = settings
-        if skipped and not self.cameras:
-            # With nothing to show yet, retry until those cameras answer.
-            names = ", ".join(camera.name for camera in skipped)
-            raise UpdateFailed(f"Couldn't read the overlay of {names}")
-        if skipped:
-            # The other cameras shouldn't wait on these.
+        if self.pending:
             _LOGGER.warning(
-                "Couldn't read the overlay of %s; reload UniFi Protect Watermark "
-                "to add %s once %s available",
-                ", ".join(camera.name for camera in skipped),
-                "it" if len(skipped) == 1 else "them",
-                "it's" if len(skipped) == 1 else "they're",
+                "Couldn't read the overlay of %s yet; trying again every %s",
+                ", ".join(camera.name for camera in self.pending.values()),
+                SCAN_INTERVAL,
             )
         self._discovered = True
+        self._async_update_support_issue()
+        return data
+
+    async def _async_retry_pending(
+        self, api: ProtectApiClient, data: OverlayData
+    ) -> None:
+        """Try the pending cameras again, and add the ones that answer."""
+        found: OverlayData = {}
+        for camera in list(self.pending.values()):
+            if camera.id not in api.bootstrap.cameras:
+                _LOGGER.debug("%s was removed from Protect", camera.name)
+                del self.pending[camera.id]
+                continue
+            try:
+                settings = await get_overlay(api, camera.id)
+            except (ClientError, TypeError) as err:
+                # A pending camera can't fail the refresh of the others.
+                if isinstance(err, BadRequest) and not isinstance(err, NotAuthorized):
+                    self._sort_rejected(api, camera, err)
+                else:
+                    _LOGGER.debug(
+                        "Couldn't read the overlay of %s: %s", camera.name, err
+                    )
+                continue
+            del self.pending[camera.id]
+            self.cameras[camera.id] = camera
+            data[camera.id] = found[camera.id] = settings
+            _LOGGER.info("Adding the watermark of %s", camera.name)
+        self._async_update_support_issue()
+        if found:
+            for listener in list(self._camera_listeners):
+                listener(found)
+
+    @callback
+    def _sort_rejected(
+        self, api: ProtectApiClient, camera: OverlayCamera, err: BadRequest
+    ) -> None:
+        """File a camera whose overlay read was turned down."""
+        self.pending.pop(camera.id, None)
+        if camera.id not in api.bootstrap.cameras:
+            _LOGGER.debug("%s was removed from Protect", camera.name)
+        elif overlay_unsupported(err, self._protect_version):
+            # Older cameras only have the legacy OSD (name, date, logo).
+            _LOGGER.debug("%s doesn't support the overlay API", camera.name)
+            self.unsupported[camera.id] = camera
+        else:
+            _LOGGER.debug("Couldn't read the overlay of %s: %s", camera.name, err)
+            self.pending[camera.id] = camera
+
+    @callback
+    def _async_update_support_issue(self) -> None:
+        if self.cameras:
+            async_delete_support_issue(self.hass, self.config_entry)
+            return
         async_update_support_issue(
             self.hass,
             self.config_entry,
-            protect_version=protect_version(api),
-            any_supported=bool(self.cameras),
-            unsupported=unsupported,
+            protect_version=self._protect_version,
+            unsupported=self.unsupported.values(),
+            pending=self.pending.values(),
         )
-        return data
 
     async def async_set_corner(
         self, camera_id: str, corner: str, content: str | None

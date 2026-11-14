@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import issue_registry as ir
 
@@ -15,7 +15,7 @@ from .const import (
     ISSUE_PUBLIC_ONLY,
 )
 from .coordinator import OverlayCoordinator, ProtectWatermarkConfigEntry
-from .support import issue_id
+from .support import async_delete_support_issue, issue_id
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -51,9 +51,18 @@ async def async_setup_entry(
     coordinator = OverlayCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    if coordinator.pending:
+        # The coordinator only polls while something listens. Without this, a
+        # setup whose cameras are all pending would never try them again.
+        entry.async_on_unload(coordinator.async_add_listener(_keep_polling))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+@callback
+def _keep_polling() -> None:
+    """Keep the coordinator polling while cameras are pending."""
 
 
 async def async_unload_entry(
@@ -66,7 +75,7 @@ async def async_unload_entry(
     """
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
-    ir.async_delete_issue(hass, DOMAIN, issue_id(ISSUE_NO_SUPPORTED_CAMERAS, entry))
+    async_delete_support_issue(hass, entry)
     return True
 
 

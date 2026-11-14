@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .api import OverlayCamera
 from .const import CORNERS, HA_TEXT_MAX
 from .coordinator import OverlayCoordinator, ProtectWatermarkConfigEntry, corner_content
-from .entity import WatermarkEntity, anchors, camera_devices, capability
+from .entity import WatermarkEntity, anchors, async_add_camera_entities, capability
 
 PARALLEL_UPDATES = 1
 
@@ -26,14 +26,18 @@ async def async_setup_entry(
 ) -> None:
     """Add the corner and date format text entities of each overlay camera."""
     coordinator = entry.runtime_data
-    entities: list[TextEntity] = []
-    for camera, device, settings in camera_devices(hass, coordinator):
-        entities.extend(
+
+    def build(
+        camera: OverlayCamera, device: dr.DeviceEntry, settings: dict[str, Any]
+    ) -> list[TextEntity]:
+        entities: list[TextEntity] = [
             WatermarkCornerText(coordinator, camera, device, corner, settings)
             for corner in anchors(settings)
-        )
+        ]
         entities.append(WatermarkDatetimeFormatText(coordinator, camera, device))
-    async_add_entities(entities)
+        return entities
+
+    async_add_camera_entities(hass, entry, async_add_entities, build)
 
 
 class WatermarkCornerText(WatermarkEntity, TextEntity):  # pyright: ignore[reportIncompatibleVariableOverride]
