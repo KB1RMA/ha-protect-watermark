@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    name: Attach zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the tag matches the manifest version
+        run: |
+          version=$(jq -r .version custom_components/protect_watermark/manifest.json)
+          test "v$version" = "${GITHUB_REF_NAME}" || test "$version" = "${GITHUB_REF_NAME}"
+      - name: Build zip
+        run: cd custom_components/protect_watermark && zip -r ../../protect_watermark.zip .
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" protect_watermark.zip
