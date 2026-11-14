@@ -4,7 +4,20 @@ version = "0.1.0"
 description = "Home Assistant custom integration that sets the text of UniFi Protect's camera watermark."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.13"
+requires-python = ">=3.14.2"
+
+[dependency-groups]
+dev = [
+    "pytest-homeassistant-custom-component==0.13.375",
+    "pyright==1.1.414",
+    "ruff==0.17.5",
+    # Must match the version the UniFi Protect integration pins in Home Assistant.
+    "uiprotect==23.0.1",
+]
+
+[tool.uv]
+# Dev tooling only: Home Assistant loads the integration from custom_components.
+package = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -16,7 +29,7 @@ addopts = "--cov=custom_components.protect_watermark --cov-report=term-missing -
 branch = true
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
