@@ -11,9 +11,11 @@
 A Home Assistant custom integration that sets the text of UniFi Protect's **visible watermark** on your
 cameras. Use it to burn live data, such as the outdoor temperature, into live view, recordings and exports.
 
-Protect 7.2 added a **Custom String** to each camera's watermark (Settings → Evidence Trust → Visible
-Watermark). This integration adds a text entity for each corner of that watermark to your existing UniFi Protect
-camera devices. Set the entity from an automation, and the text appears on the camera.
+[UniFi Protect 7.2.98](https://community.ui.com/releases/UniFi-Protect-Application-7-2-98/3b090596-55f5-4c27-824b-44951c2d4a25),
+released on 3 August 2026, added Evidence Trust and visible watermarks. Each camera's watermark can include a
+**Custom String** (Settings → Evidence Trust → Visible Watermark). This integration adds a text entity for each
+corner of that watermark to your existing UniFi Protect camera devices. Set the entity from an automation, and
+the text appears on the camera.
 
 ## How it works
 
@@ -49,9 +51,11 @@ The custom logo image itself can only be uploaded in Protect.
 ## Requirements
 
 - Home Assistant 2026.10 or newer.
-- UniFi Protect 7.2.98 or newer, and cameras on firmware 5.4 or newer that support the new overlay. G6-series
-  cameras do. Older models (G4 cameras and the G4 Doorbell, for example) only have the legacy name, date and logo
-  toggles, and get no entities.
+- UniFi Protect 7.2.98 or newer, the first 7.2 release
+  ([release notes](https://community.ui.com/releases/UniFi-Protect-Application-7-2-98/3b090596-55f5-4c27-824b-44951c2d4a25)).
+- Cameras on firmware 5.4 or newer that support the visible watermark. Protect's release notes list firmware 5.4
+  as the requirement for visible watermarks. G6-series cameras support it. Older models (G4 cameras and the G4
+  Doorbell, for example) only have the legacy name, date and logo toggles, and get no entities.
 - The UniFi Protect integration, set up with a **local username and password** (not only an API key). The
   watermark is only on Protect's private API, so a public-API-only setup can't change it. That user needs
   permission to edit camera settings.
