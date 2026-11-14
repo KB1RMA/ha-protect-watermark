@@ -21,7 +21,9 @@ from .api import (
     adopted_cameras,
     get_overlay,
     get_protect_client,
+    overlay_unsupported,
     patch_overlay,
+    protect_version,
 )
 from .const import CONF_PROTECT_ENTRY_ID, DOMAIN, SCAN_INTERVAL
 from .support import async_update_support_issue
@@ -98,7 +100,11 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
                 raise UpdateFailed(
                     "The UniFi Protect user can't read camera settings"
                 ) from err
-            except BadRequest:
+            except BadRequest as err:
+                if not overlay_unsupported(err):
+                    raise UpdateFailed(
+                        f"Couldn't read the overlay of {camera.name}: {err}"
+                    ) from err
                 # Older cameras only have the legacy OSD (name, date, logo).
                 _LOGGER.debug("%s doesn't support the overlay API", camera.name)
                 unsupported.append(camera)
@@ -113,7 +119,7 @@ class OverlayCoordinator(DataUpdateCoordinator[OverlayData]):
         async_update_support_issue(
             self.hass,
             self.config_entry,
-            api,
+            protect_version=protect_version(api),
             any_supported=bool(self.cameras),
             unsupported=unsupported,
         )

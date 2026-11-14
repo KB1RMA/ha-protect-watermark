@@ -89,7 +89,10 @@ class FakeProtect:
             if camera_id in self.get_error:
                 raise self.get_error[camera_id]
             if camera_id not in self.settings:
-                raise BadRequest("Camera does not support the overlay API")
+                raise BadRequest(
+                    f"Request failed: {url} - Status: 400 - Reason: "
+                    "Camera does not support the overlay API"
+                )
             return deepcopy(self.settings[camera_id])
         assert method == "patch"
         body: dict[str, Any] = kwargs["json"]

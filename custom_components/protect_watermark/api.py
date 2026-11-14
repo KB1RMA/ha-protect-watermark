@@ -13,9 +13,12 @@ It isn't in the public Integration API as of Protect 7.2.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from http import HTTPStatus
+import re
 from typing import Any, cast
 
 from uiprotect import ProtectApiClient
+from uiprotect.exceptions import BadRequest
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -86,6 +89,24 @@ def adopted_cameras(api: ProtectApiClient) -> list[OverlayCamera]:
 def protect_version(api: ProtectApiClient) -> str:
     """Return the console's UniFi Protect version."""
     return str(api.bootstrap.nvr.version)
+
+
+# uiprotect puts the HTTP status only in the message of the errors it raises.
+_STATUS = re.compile(r"Status: (\d{3})")
+
+
+def overlay_unsupported(err: BadRequest) -> bool:
+    """Return whether an overlay read failed because the API isn't there.
+
+    Protect answers 400 for a camera without the overlay API, and a version
+    without the route answers 404. ``uiprotect`` raises ``BadRequest`` for
+    every other 4xx too (a camera that's updating, for one), and those
+    shouldn't be read as the camera lacking the watermark. An error without a
+    status didn't come from Protect's answer, so it's taken as unsupported.
+    """
+    if (match := _STATUS.search(str(err))) is None:
+        return True
+    return int(match.group(1)) in (HTTPStatus.BAD_REQUEST, HTTPStatus.NOT_FOUND)
 
 
 async def get_overlay(api: ProtectApiClient, camera_id: str) -> dict[str, Any]:

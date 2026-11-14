@@ -49,9 +49,9 @@ The custom logo image itself can only be uploaded in Protect.
 ## Requirements
 
 - Home Assistant 2026.10 or newer.
-- UniFi Protect 7.2 or newer, and cameras that support the new overlay. G6-series cameras do. Older models
-  (G4 cameras and the G4 Doorbell, for example) only have the legacy name, date and logo toggles, and get no
-  entities.
+- UniFi Protect 7.2.98 or newer, and cameras on firmware 5.4 or newer that support the new overlay. G6-series
+  cameras do. Older models (G4 cameras and the G4 Doorbell, for example) only have the legacy name, date and logo
+  toggles, and get no entities.
 - The UniFi Protect integration, set up with a **local username and password** (not only an API key). The
   watermark is only on Protect's private API, so a public-API-only setup can't change it. That user needs
   permission to edit camera settings.
