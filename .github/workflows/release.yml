@@ -5,7 +5,8 @@ name: Release
 # with the zip already attached: first as a draft, then published.
 #
 # The release notes are the tag's message, so write them in the annotated
-# tag: git tag -s v1.2.3 -F notes.md
+# tag. --cleanup=verbatim keeps Markdown headings, which git otherwise
+# strips as comments: git tag -s v1.2.3 --cleanup=verbatim -F notes.md
 
 on:
   push:
