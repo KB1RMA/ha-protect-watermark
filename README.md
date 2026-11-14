@@ -24,8 +24,8 @@ thing here.
 
 > [!IMPORTANT]
 > Your UniFi Protect integration must be signed in with a **local username and password**. An API-key-only
-> setup can't change the watermark: adding this integration stops with a message saying so, and an existing
-> setup shows a repair under **Settings → Repairs**. See [Requirements](#requirements).
+> setup can't change the watermark: this integration won't load, and a repair under **Settings → Repairs**
+> says why. See [Requirements](#requirements).
 
 ## How it works
 
@@ -68,12 +68,13 @@ The custom logo image itself can only be uploaded in Protect.
   Doorbell, for example) only have the legacy name, date and logo toggles, and get no entities.
 - The UniFi Protect integration, set up with a **local username and password** (not only an API key). The
   watermark is only on Protect's private API, so a public-API-only setup can't change it. That user needs
-  permission to edit camera settings. Without this, adding the integration stops with "Set up the UniFi
-  Protect integration first", or an existing setup shows the repair "UniFi Protect has no private API
-  access".
+  permission to edit camera settings. With an API key only, this integration fails to load and shows the
+  repair "UniFi Protect has no private API access". If UniFi Protect isn't loaded at all, adding this
+  integration stops with "Set up the UniFi Protect integration first".
 
-If no camera qualifies, the integration still loads, and a repair under **Settings → Repairs** lists each
-camera's model and firmware against these minimums.
+If none of your cameras qualifies, the integration still loads, and a repair under **Settings → Repairs**
+lists each camera and its firmware against these minimums. A camera that can't be read yet, because it's
+offline for example, is retried rather than judged.
 
 ## Installation
 
@@ -107,11 +108,15 @@ Cameras added to Protect later get their entities after you reload the integrati
 
 ## Quick start: outdoor temperature in the top-right corner
 
-This automation writes the temperature to one camera whenever it changes. Replace the two entity IDs with
-yours.
+This automation writes the temperature to one camera whenever it changes. Replace
+`sensor.outdoor_temperature` (it appears three times) and `text.driveway_watermark_top_right` with your own
+entity IDs.
 
 ```yaml
-alias: Camera watermark temperature
+alias: Camera watermark temperature (quick start)
+mode: queued
+max: 2
+max_exceeded: silent
 triggers:
   - trigger: state
     entity_id: sensor.outdoor_temperature
@@ -128,7 +133,8 @@ actions:
       value: "{{ states('sensor.outdoor_temperature') | float | round(0) | int }}°F"
 ```
 
-The `numeric_state` condition skips `unavailable` and `unknown`, so those never reach the video. For
+The `numeric_state` condition skips `unavailable` and `unknown`, so those never reach the video. `queued`
+keeps a reading that arrives during a write instead of dropping it (see **Queueing** below). For
 Celsius, change `°F` to `°C`. You can test the entity without an automation: open it in Home Assistant, type
 some text and check the camera's live view.
 
@@ -136,7 +142,8 @@ some text and check the camera's live view.
 
 The quick start keeps showing the last temperature if the sensor stops reporting. Because the watermark is
 burned into recordings, you may prefer to show `--°F` instead. This version does that, and updates every
-camera at once.
+camera at once. It replaces the quick start, so delete that automation first, or both will write to the same
+camera.
 
 First, add a `camera_watermark` label to each **Watermark top right** entity you want updated (open the
 entity → settings → **Labels**). The automation targets that label rather than individual entities.
