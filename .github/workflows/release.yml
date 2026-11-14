@@ -1,25 +1,36 @@
 name: Release
 
+# Releases are immutable, so a release's files can't be added once it's
+# published. Pushing a version tag builds the zip and creates the release
+# with the zip already attached: first as a draft, then published.
+#
+# The release notes are the tag's message, so write them in the annotated
+# tag: git tag -s v1.2.3 -F notes.md
+
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  zip:
-    name: Attach zip
+  release:
+    name: Build and publish
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - name: Check the tag matches the manifest version
         run: |
           version=$(jq -r .version custom_components/protect_watermark/manifest.json)
-          test "v$version" = "${GITHUB_REF_NAME}" || test "$version" = "${GITHUB_REF_NAME}"
+          test "v$version" = "${GITHUB_REF_NAME}"
       - name: Build zip
         run: cd custom_components/protect_watermark && zip -r ../../protect_watermark.zip .
-      - name: Upload
+      - name: Create the release with the zip
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" protect_watermark.zip
+        run: |
+          gh release create "${GITHUB_REF_NAME}" protect_watermark.zip \
+            --verify-tag --draft --title "${GITHUB_REF_NAME}" --notes-from-tag
+          gh release edit "${GITHUB_REF_NAME}" --draft=false
