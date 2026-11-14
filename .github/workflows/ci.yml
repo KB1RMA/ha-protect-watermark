@@ -45,7 +45,13 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run pytest
+      # Coverage source, branch coverage and the 100% floor are set in
+      # pyproject.toml. This only adds the XML report Codecov reads.
+      - run: uv run pytest --cov-report=xml
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   hassfest:
     name: Hassfest
