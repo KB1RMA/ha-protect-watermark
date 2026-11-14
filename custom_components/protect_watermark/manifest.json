@@ -4,6 +4,9 @@
   "after_dependencies": [
     "unifiprotect"
   ],
+  "categories": [
+    "security_safety.cameras"
+  ],
   "codeowners": [
     "@KB1RMA"
   ],
