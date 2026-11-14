@@ -78,26 +78,56 @@ triggers:
   - trigger: state
     entity_id: sensor.outdoor_temperature
     to: null
-conditions:
-  - condition: numeric_state
-    entity_id: sensor.outdoor_temperature
-    above: -100
+    id: reading
+  - trigger: template
+    value_template: >-
+      {% set s = states.sensor.outdoor_temperature %}
+      {{ s is none or now() - s.last_reported > timedelta(minutes=30) }}
+    id: stale
+  - trigger: template
+    value_template: >-
+      {% set s = states.sensor.outdoor_temperature %}
+      {{ s is not none and now() - s.last_reported <= timedelta(minutes=30) }}
+    id: recovered
 actions:
-  - action: text.set_value
-    target:
-      label_id: camera_watermark
-    data:
-      value: "{{ states('sensor.outdoor_temperature') | float | round(0) | int }}°F"
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: stale
+        sequence:
+          - action: text.set_value
+            target:
+              label_id: camera_watermark
+            data:
+              value: "--°F"
+      - conditions:
+          - condition: numeric_state
+            entity_id: sensor.outdoor_temperature
+            above: -100
+        sequence:
+          - action: text.set_value
+            target:
+              label_id: camera_watermark
+            data:
+              value: "{{ states('sensor.outdoor_temperature') | float | round(0) | int }}°F"
 ```
 
 Add the `camera_watermark` label to each **Watermark top right** entity you want updated.
 
-- `to: null` fires on state changes only, not attribute updates.
-- The `numeric_state` condition skips `unavailable`, `unknown` and other non-numeric states.
-- `queued` with `max: 2` lets one write finish while keeping only the latest reading waiting. Home Assistant
-  doesn't accept `max: 1` for queued mode.
-- Rounding to a whole degree, plus the integration skipping writes that change nothing, means Protect is only
-  written when the displayed value changes.
+- **Readings.** `to: null` fires on state changes only, not attribute updates. The `numeric_state` condition
+  skips `unavailable`, `unknown` and other non-numeric states.
+- **Stale readings.** The watermark is burned into recordings, so an old temperature shouldn't stay on them. If
+  the sensor hasn't reported for 30 minutes, the corner shows `--°F`. This uses `last_reported`, which moves on
+  every report even when the value is unchanged, so it catches a sensor that went `unavailable` and one that
+  froze on its last value, as cloud weather stations can. A state trigger with `for:` wouldn't work: it
+  restarts only when the value changes, so a steady temperature would look stale.
+- **Recovery.** `recovered` fires when reports resume, so a sensor that comes back with the same value it froze
+  on still replaces `--°F`.
+- **Queueing.** `queued` with `max: 2` lets one write finish while keeping only the latest reading waiting. Home
+  Assistant doesn't accept `max: 1` for queued mode.
+- **Writes.** Rounding to a whole degree, plus the integration skipping writes that change nothing, means
+  Protect is only written when the displayed value changes.
+- **Units.** For Celsius, change `°F` to `°C` in both values.
 
 The `°` sign renders on G6 cameras. Check other special characters on your cameras before relying on them.
 
