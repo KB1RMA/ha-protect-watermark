@@ -72,28 +72,34 @@ Cameras added to Protect later get their entities after you reload the integrati
 ```yaml
 alias: Camera watermark temperature
 mode: queued
-max: 1
+max: 2
+max_exceeded: silent
 triggers:
   - trigger: state
     entity_id: sensor.outdoor_temperature
+    to: null
 conditions:
-  - condition: not
-    conditions:
-      - condition: state
-        entity_id: sensor.outdoor_temperature
-        state: [unavailable, unknown]
+  - condition: numeric_state
+    entity_id: sensor.outdoor_temperature
+    above: -100
 actions:
   - action: text.set_value
     target:
       label_id: camera_watermark
     data:
-      value: "{{ states('sensor.outdoor_temperature') | float | round(0) | int }}F"
+      value: "{{ states('sensor.outdoor_temperature') | float | round(0) | int }}°F"
 ```
 
-Add the `camera_watermark` label to each **Watermark top right** entity you want updated. Rounding means Protect
-is only written to when the whole-degree value changes.
+Add the `camera_watermark` label to each **Watermark top right** entity you want updated.
 
-Check how your cameras render special characters, such as `°`, before relying on them.
+- `to: null` fires on state changes only, not attribute updates.
+- The `numeric_state` condition skips `unavailable`, `unknown` and other non-numeric states.
+- `queued` with `max: 2` lets one write finish while keeping only the latest reading waiting. Home Assistant
+  doesn't accept `max: 1` for queued mode.
+- Rounding to a whole degree, plus the integration skipping writes that change nothing, means Protect is only
+  written when the displayed value changes.
+
+The `°` sign renders on G6 cameras. Check other special characters on your cameras before relying on them.
 
 ## Limits and risks
 
