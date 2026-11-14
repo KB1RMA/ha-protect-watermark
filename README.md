@@ -1,5 +1,13 @@
 # UniFi Protect Watermark
 
+[![GitHub release](https://img.shields.io/github/v/release/KB1RMA/ha-protect-watermark)](https://github.com/KB1RMA/ha-protect-watermark/releases/latest)
+[![Marketplace: custom repository](https://img.shields.io/badge/Marketplace-custom_repository-41BDF5)](#installation)
+[![Home Assistant 2026.10+](https://img.shields.io/badge/Home_Assistant-2026.10%2B-41BDF5?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
+[![CI](https://github.com/KB1RMA/ha-protect-watermark/actions/workflows/ci.yml/badge.svg)](https://github.com/KB1RMA/ha-protect-watermark/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/KB1RMA/ha-protect-watermark)](LICENSE)
+
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=KB1RMA&repository=ha-protect-watermark&category=integration)
+
 A Home Assistant custom integration that sets the text of UniFi Protect's **visible watermark** on your
 cameras. Use it to burn live data, such as the outdoor temperature, into live view, recordings and exports.
 
@@ -50,9 +58,20 @@ The custom logo image itself can only be uploaded in Protect.
 
 ## Installation
 
-### HACS
+### Marketplace (Home Assistant 2026.11 and newer)
 
-1. In HACS, open the menu → **Custom repositories**, and add this repository as an **Integration**.
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=KB1RMA&repository=ha-protect-watermark&category=integration)
+
+1. Select the button above, or go to **Settings → Marketplace → Add from link** and enter
+   `KB1RMA/ha-protect-watermark`.
+2. Install **UniFi Protect Watermark** and restart Home Assistant.
+
+### HACS (Home Assistant 2026.10)
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=KB1RMA&repository=ha-protect-watermark&category=integration)
+
+1. Select the button above, or in HACS open the menu → **Custom repositories** and add this repository as an
+   **Integration**.
 2. Install **UniFi Protect Watermark** and restart Home Assistant.
 
 ### Manual
