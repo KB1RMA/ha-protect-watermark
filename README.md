@@ -18,7 +18,7 @@ released on 3 August 2026, added Evidence Trust and visible watermarks. Each cam
 corner of that watermark to your existing UniFi Protect camera devices. Set the entity from an automation, and
 the text appears on the camera.
 
-![The top-right corner of a G6 Bullet's picture, with the outdoor temperature, 45°F, in the watermark](https://raw.githubusercontent.com/KB1RMA/ha-protect-watermark/main/docs/images/watermark-top-right.jpg)
+![The top-right corner of a G6 Bullet's picture, with the outdoor temperature and humidity, 47°F and 57%, in the watermark](https://raw.githubusercontent.com/KB1RMA/ha-protect-watermark/main/docs/images/watermark-top-right.jpg)
 
 Protect's UI calls this the *visible watermark*, and its API calls it the *overlay*. Both names mean the same
 thing here.
@@ -209,7 +209,43 @@ How it works:
   Protect is only written when the displayed value changes.
 - **Units.** For Celsius, change `°F` to `°C` in both values.
 
-The `°` sign renders on G6 cameras. Check other special characters on your cameras before relying on them.
+The `°` sign renders on G6 cameras. See [Supported characters](#supported-characters) for what else does.
+
+## Supported characters
+
+Protect draws the watermark in its own font, which has no emoji. A character it can't draw shows as `?` in the
+picture. Home Assistant and this integration accept any text, up to 255 characters or the camera's own limit if
+that's lower, so the camera decides what you see.
+
+Plain symbols for letters, punctuation, math, arrows and geometric shapes mostly work. Emoji, dingbats such as
+hearts and snowflakes, and most weather and object pictograms don't. For example, `◆ 45°F │ H 61%` works, and
+`🌡 45°F` shows a `?`.
+
+![Characters that render in the watermark: symbols, arrows, Greek letters, currency signs, fractions and math](https://raw.githubusercontent.com/KB1RMA/ha-protect-watermark/main/docs/images/watermark-supported-characters.jpg)
+
+![Emoji and dingbats in the watermark, all drawn as question marks](https://raw.githubusercontent.com/KB1RMA/ha-protect-watermark/main/docs/images/watermark-unsupported-characters.jpg)
+
+| Group | Works | Shows `?` |
+|---|---|---|
+| Common symbols | `▲ ▼ ● ◆ ★ ♥ • · │ § ± °` | |
+| Approximately | `≈` (small, so it can look like `=`) | |
+| Arrows | `↑ ↓ ← → ↔ ⇒ ⇑ ⇓ ↗ ↘ ↖ ↙ ↕` (the plain arrows are small) | `➔ ➜ ➡ ⬅ ⬆ ⬇` |
+| Shapes | `► ◄ ▶ ◀ ■ □ ▪ ▫ △ ▽ ◇ ○ ◎` (most are small) | `⬛ ⬜ ⬤` |
+| Cards, music, symbols | `☆ ♦ ♠ ♣ ♪ ♫ ♀ ♂ ☺ ☻` | `❤ ❥ ✚ ✪ ✦ ❖ ⚑ ☠ ✿ ✱ ✲ ✳ ❋` |
+| Check and cross | `✓ ✔` (`✓` looks like `√`), `✘` (drawn as `✗`), `✕` and `✖` (drawn as `×`) | `✗` |
+| Weather and objects | `☀` (small sun), `☼`, `♨`, `☎`, `⌂` | `☁ ☂ ☃ ❄ ❅ ❆ ☔ ⛅ ☽ ☾ ⚡ ⚠ ⌛ ⏰ ⏳ ⛄ ✈ ✉ ✂` |
+| Emoji | | 🌡 💧 ❄ and all other emoji |
+| Box drawing | `┌ ─ ┐ └ ┘ ├ ┤ ║ ═ ╔ ╗ ╚ ╝ ┃ ━ ┼ ╱ ╲`, but the lines have gaps, so they don't join into clean boxes | |
+| Blocks | `░ ▒ ▓ █ ▌ ▏` | |
+| Latin-1 | `¡ ¿ « » ¶ ¦ ¨ ¯ ´ ¸ ª º ¹ ² ³ ¬ µ © ® ™ € £ ¥ ¢ ½ ¼ ¾ × ÷` | |
+| Accented letters | `à é î õ ü ñ ç ß ø æ` | |
+| Greek | `Α Β Γ Θ Λ Ξ Σ Φ Ψ α β γ δ ε ζ η θ λ μ ξ π ρ σ τ φ χ ψ ω Δ Ω` | |
+| Math | `≠ ≤ ≥ ∞ √ ∑ ∂ ∫ ∆ ≡ ≪ ∈ ⁰ ⁴ ₀ ₂ ‰ ′ ″ ℃ ℉ №` | |
+| Punctuation | `– — … ‘ ’ “ ”` | |
+
+Ubiquiti doesn't document the font or its character coverage, so characters not listed here may or may not
+work, and coverage may differ between camera models and firmware. If you find one that works or doesn't, please
+open an issue.
 
 ## Limits and risks
 
