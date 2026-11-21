@@ -49,7 +49,7 @@ jobs:
       # pyproject.toml. This only adds the XML report Codecov reads.
       - run: uv run pytest --cov-report=xml
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
